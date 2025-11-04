@@ -1,0 +1,6 @@
+LAMMPS_simulations/
+Random_Carbon_Structures/
+*.log
+Analysis/
+log.lammps
+test

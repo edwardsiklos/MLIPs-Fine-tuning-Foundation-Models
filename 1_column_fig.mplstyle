@@ -1,0 +1,45 @@
+# Fig size
+figure.figsize: 3.35, 2.5
+
+# Font
+font.family : sans-serif
+font.sans-serif : Arial
+
+# Text sizes
+font.size : 7
+axes.titlesize : 8
+axes.labelsize : 7
+legend.fontsize : 5
+figure.titlesize : 8
+
+# Line widths
+lines.linewidth : 0.65        # for data (line plots)
+axes.linewidth : 0.5         # thin lines
+grid.linewidth : 0.5
+patch.linewidth : 0.65       # thick lines (for outlines, boxes, etc.)
+
+# Markers and Error Bars
+lines.markersize: 1.5
+errorbar.capsize: 1.5
+
+# Grid settings
+axes.grid : True
+axes.grid.which : both       # show both major and minor gridlines
+
+# Make grid less visually dominant
+grid.alpha: 0.3
+grid.linestyle: :
+
+# Resolution
+figure.dpi : 600
+savefig.dpi : 600
+
+# Colour
+image.cmap: viridis
+axes.prop_cycle: cycler(color=["#004488", "#DDAA33", "#BB5566", "#117733"])
+
+# Autofitting
+figure.autolayout : True
+
+# Save options
+savefig.pad_inches : 0.1
