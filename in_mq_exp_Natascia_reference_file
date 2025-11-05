@@ -1,22 +1,22 @@
-#!/bin/bash 
-#timer timeout 0 every 1
-log ${rundir}/log_nvt_${system}.dat append
+log ${rundir}/lammps_logfile append
 
-units ${units}
+units metal
 atom_style atomic
 
+# --- read data or restart ---
 if "${restart_from} == data" then "read_data ${data_file}"
 if "${restart_from} == data" then "reset_timestep 0"
-if "${restart_from} == continuation" then "read_restart ${rundir}/restart_nvt_${system}.*"
+if "${restart_from} == continuation" then "read_restart ${rundir}/restart.*"
 
+# --- potentials ---
 mass 1 12.011
-pair_style ${pair_style}
-pair_coeff ${pair_coeff}
-#pair_coeff * * carbon.xml "Potential xml_label=GAP_2017_1_20_0_21_37_48_267" 6
+pair_style quip
+pair_coeff * * ${pot} "" 6
 
 neighbor 2.0 bin 
 neigh_modify every 1 delay 0 check yes 
 
+# --- thermodynamics ---
 variable Nfreq equal 100
 variable Nprint equal 100
 variable Nevery equal 100
@@ -26,7 +26,8 @@ variable nAtoms equal atoms
 
 group carbon type 1
 
-timestep 0.001 
+timestep 0.001 # 1fs
+variable dt equal 0.001
 
 fix removeMomentum all momentum 1 linear 1 1 1 
 
@@ -47,26 +48,26 @@ compute MSD all msd
 
 thermo_style custom step cpu temp f_TempAve press f_PressAve f_PEAve vol f_vAve c_MSD[4] 
 thermo_modify flush yes
-
 thermo ${Nfreq}
 
-#dump traj       all atom ${Ndump}  ${rundir}/NVT/dump_nvt_${system}.*.dat 
-dump 1 all custom ${Ndump} ${rundir}/NVT/dump_custom.${system}.*.dat id type x y z fx fy fz c_PEa
-dump_modify 1 pad 5
+# --- dump & restart ---
+dump 1 all custom ${Ndump} ${rundir}/dump.dat id type x y z fx fy fz c_PEa
+dump_modify 1 append yes
 
-restart ${Ndump} ${rundir}/restart/restart_nvt_${system}.*
+restart ${Ndump} ${rundir}/restart.last ${rundir}/restart.last
 
-# Compute cumulative run lengths so we can use run ... upto
-variable Nrun1 equal ${randomize_timesteps}                             # hold at t_randomize
-variable Nrun2 equal (${Nrun1}+${melt_timesteps})                       # hold at t_melt
-variable Nrun3 equal (${Nrun2}+${cool_timesteps})                       # end of ramp to t_cool
-variable Nrun4 equal (${Nrun3}+${anneal_timesteps})                     # end of anneal (total run length)
+# --- define run steps ---
+variable Nrun1 equal ${randomize_steps}
+variable Nrun2 equal (${Nrun1}+${melt_steps})
+variable Nrun3 equal (${Nrun2}+${quench_steps})
+variable Nrun4 equal (${Nrun3}+${anneal_steps})
 
-if "${melt_timesteps} > 0 && $(step) == 0" then "velocity all create ${t_melt} ${rand}"
+# --- initial velocity ---
+if "${randomize_steps} > 0 && $(step) == 0" then "velocity all create ${t_randomize} ${rand}"
 
 run 0
 
-# ---------------- Step 1: hold at t_randomize for randomize_timesteps ----------------
+# --- randomize phase (Langevin + NVE) ---
 fix integrator all nve
 fix thermostat all langevin ${t_randomize} ${t_randomize} 0.1 ${rand}
 
@@ -74,7 +75,7 @@ if "$(step) < ${Nrun1}" then "run ${Nrun1} upto"
 unfix thermostat
 unfix integrator
 
-# ---------------- Step 2: hold at t_melt for melt_timesteps ----------------
+# --- melt phase ---
 fix integrator all nve
 fix thermostat all langevin ${t_melt} ${t_melt} 0.1 ${rand}
 
@@ -82,11 +83,11 @@ if "$(step) < ${Nrun2}" then "run ${Nrun2} upto start ${Nrun1} stop ${Nrun2}"
 unfix thermostat
 unfix integrator
 
-# ---------------- Step 3: exponential quench from t_melt -> t_cool over cool_timesteps ----------------
+# --- exponential quench phase ---
 variable Tmelt equal ${t_melt}
-variable Tquench equal ${t_cool}
+variable Tquench equal ${t_quench}
 variable k equal 7
-variable nsteps_quench equal ${cool_timesteps}
+variable nsteps_quench equal ${quench_steps}
 variable nchunks equal 5  # 500/5 = 100 steps per chunk to allow equilibration
 variable chunk_size equal ${nsteps_quench}/${nchunks}
 variable ichunk loop ${nchunks}
@@ -104,13 +105,13 @@ unfix integrator
 next ichunk
 jump SELF quench_loop
 
-# ---------------- Step 4: anneal at t_anneal for anneal_timesteps ----------------
+# --- anneal phase ---
 fix integrator all nve
-fix thermostat all langevin ${t_anneal} ${t_anneal} 0.1 ${rand}
+fix thermostat all langevin ${t_quench} ${t_quench} 0.1 ${rand}
 
 if "$(step) < ${Nrun4}" then "run ${Nrun4} upto start ${Nrun3} stop ${Nrun4}"
 unfix thermostat
 unfix integrator
 
-# Write Data
-write_data ${rundir}/out_data_quench_${system}
+# --- final output ---
+write_data ${rundir}/out_data.dat

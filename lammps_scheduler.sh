@@ -28,15 +28,23 @@ lmp_exec=$DIR/lmp_cpu_mpich_quip # LAMMPS executable binary file
 # Starting structure - provided by qsub -v STRUCTURE=... in the run script
 s=$STRUCTURE
 
-# Melt quench parameters, also defined in the run script
-melt_timesteps=$MELT_TIMESTEPS
-t_melt=$T_MELT
-cool_timesteps=$COOL_TIMESTEPS
-t_cool=$T_COOL
+# Run Script Parameters
+# This is the standard protocol for amorphous carbon modelling as outlined in GAP17 Methodology
+t_randomize=9000 
+randomize_timesteps=3000   
+t_melt=5000          
+melt_timesteps=3000  
+t_cool=300            
+cool_timesteps=500    
+t_anneal=300          
+anneal_timesteps=3000  
 
-# name of the run directory that gets created - based on simulation parameters             
-rundir="run_${1}_C_nvt_$(basename "$s")_m${melt_timesteps}_c${cool_timesteps}" 
+# Name of the run directory that gets created - based on simulation parameters captured in unique_key
+unique_key=$UNIQUE_KEY
 
+rundir="${unique_key}_${1}"              
+
+# e.g. C_GAP17_NVT_216_1.5gcm_1
 #-----------------------------------------------------------------------------------
 
 # this takes care of copying back your data from the compute node when the job finishes
@@ -88,10 +96,14 @@ mpirun -np $NMPI $lmp_exec -in ${lmp_in} \
    -var pair_style "${pair_style}" \
    -var pair_coeff "${pair_coeff}" \
 \
-   -var t_melt ${t_melt} \
-   -var melt_timesteps ${melt_timesteps} \
-   -var t_cool ${t_cool} \
-   -var cool_timesteps ${cool_timesteps} \
+  -var t_randomize ${t_randomize} \
+  -var randomize_timesteps ${randomize_timesteps} \
+  -var t_melt ${t_melt} \
+  -var melt_timesteps ${melt_timesteps} \
+  -var t_cool ${t_cool} \
+  -var cool_timesteps ${cool_timesteps} \
+  -var t_anneal ${t_anneal} \
+  -var anneal_timesteps ${anneal_timesteps} \
 \
    -var model ${model} \
    -var rundir ${rundir} \
@@ -107,7 +119,3 @@ wait $pid
 
 cd $DIR
 mv $JOB_ID.log $DIR/$rundir/
-
-
-
-
