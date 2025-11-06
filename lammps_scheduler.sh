@@ -91,11 +91,10 @@ cd $TMPDIR  # use the temporary directory local to the compute node. This avoids
 
 # Generate random seed between 1 and 900 million for the Marsaglia random # generator
 # --- Generate a valid random seed: 1 < RAND_SEED < 900000000 ---
-seed_raw=$(od -An -N4 -tu4 /dev/urandom | tr -d '[:space:]')
-RAND_SEED=$(( (seed_raw % 899999998) + 2 ))  # 2..899999999 inclusive
+rand=$((1 + RANDOM % 900000000))
 
 mpirun -np $NMPI $lmp_exec -in ${lmp_in} \
-   -var rand ${RAND_SEED} \
+   -var rand ${rand} \
    -var system ${system} \
    -var units ${units} \
    -var pair_style "${pair_style}" \
