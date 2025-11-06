@@ -1,0 +1,267 @@
+
+units ${units}
+units metal
+atom_style atomic
+
+if "${restart_from} == data" then "read_data ${data_file}"
+read_data ${data_file}
+read_data C_GAP17_NVT_64_2.0_1/2.0_gcm
+Reading data file ...
+  orthogonal box = (0.0000000 0.0000000 0.0000000) to (8.6072316 8.6072316 8.6072316)
+  2 by 2 by 4 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.015 seconds
+if "${restart_from} == data" then "reset_timestep 0"
+reset_timestep 0
+if "${restart_from} == continuation" then "read_restart ${rundir}/restart_nvt_${system}.*"
+
+mass 1 12.011
+pair_style ${pair_style}
+pair_style quip
+pair_coeff ${pair_coeff}
+pair_coeff * * /home/omega/vld/scat9451/main_project/carbon.xml "" 6
+#pair_coeff * * carbon.xml "Potential xml_label=GAP_2017_1_20_0_21_37_48_267" 6
+
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+variable Nfreq equal 100
+variable Nprint equal 100
+variable Nevery equal 100
+variable Nrepeat equal ${Nfreq}/${Nevery}
+variable Nrepeat equal 100/${Nevery}
+variable Nrepeat equal 100/100
+variable Ndump equal 100
+variable nAtoms equal atoms
+
+group carbon type 1
+64 atoms in group carbon
+
+timestep 0.001
+
+fix removeMomentum all momentum 1 linear 1 1 1
+
+compute T all temp
+fix TempAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} c_T
+fix TempAve all ave/time 100 ${Nrepeat} ${Nfreq} c_T
+fix TempAve all ave/time 100 1 ${Nfreq} c_T
+fix TempAve all ave/time 100 1 100 c_T
+
+variable P equal press
+fix PressAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} v_P
+fix PressAve all ave/time 100 ${Nrepeat} ${Nfreq} v_P
+fix PressAve all ave/time 100 1 ${Nfreq} v_P
+fix PressAve all ave/time 100 1 100 v_P
+
+variable v equal vol
+fix vAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} v_v
+fix vAve all ave/time 100 ${Nrepeat} ${Nfreq} v_v
+fix vAve all ave/time 100 1 ${Nfreq} v_v
+fix vAve all ave/time 100 1 100 v_v
+
+compute PE all pe pair
+fix PEAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} c_PE
+fix PEAve all ave/time 100 ${Nrepeat} ${Nfreq} c_PE
+fix PEAve all ave/time 100 1 ${Nfreq} c_PE
+fix PEAve all ave/time 100 1 100 c_PE
+compute PEa all pe/atom pair
+
+compute MSD all msd
+
+thermo_style custom step cpu temp f_TempAve press f_PressAve f_PEAve vol f_vAve c_MSD[4]
+thermo_modify flush yes
+
+thermo ${Nfreq}
+thermo 100
+
+#dump traj       all atom ${Ndump}  ${rundir}/NVT/dump_nvt_${system}.*.dat
+dump 1 all custom ${Ndump} ${rundir}/NVT/dump_custom.${system}.*.dat id type x y z fx fy fz c_PEa
+dump 1 all custom 100 ${rundir}/NVT/dump_custom.${system}.*.dat id type x y z fx fy fz c_PEa
+dump 1 all custom 100 C_GAP17_NVT_64_2.0_1/NVT/dump_custom.${system}.*.dat id type x y z fx fy fz c_PEa
+dump 1 all custom 100 C_GAP17_NVT_64_2.0_1/NVT/dump_custom.C.*.dat id type x y z fx fy fz c_PEa
+dump_modify 1 pad 5
+
+restart ${Ndump} ${rundir}/restart/restart_nvt_${system}.*
+restart 100 ${rundir}/restart/restart_nvt_${system}.*
+restart 100 C_GAP17_NVT_64_2.0_1/restart/restart_nvt_${system}.*
+restart 100 C_GAP17_NVT_64_2.0_1/restart/restart_nvt_C.*
+
+# Compute cumulative run lengths so we can use run ... upto
+variable Nrun1 equal ${randomize_timesteps}                             # hold at t_randomize
+variable Nrun1 equal 3000                             
+variable Nrun2 equal (${Nrun1}+${melt_timesteps})                       # hold at t_melt
+variable Nrun2 equal (3000+${melt_timesteps})                       
+variable Nrun2 equal (3000+3000)                       
+variable Nrun3 equal (${Nrun2}+${cool_timesteps})                       # end of ramp to t_cool
+variable Nrun3 equal (6000+${cool_timesteps})                       
+variable Nrun3 equal (6000+500)                       
+variable Nrun4 equal (${Nrun3}+${anneal_timesteps})                     # end of anneal (total run length)
+variable Nrun4 equal (6500+${anneal_timesteps})                     
+variable Nrun4 equal (6500+3000)                     
+
+if "${melt_timesteps} > 0 && $(step) == 0" then "velocity all create ${t_melt} ${rand}"
+velocity all create ${t_melt} ${rand}
+velocity all create 5000 ${rand}
+velocity all create 5000 32375
+
+run 0
+Neighbor list info ...
+  update every 1 steps, delay 0 steps, check yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.7
+  ghost atom cutoff = 5.7
+  binsize = 2.85, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair quip, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+       0            0         5000         5000    151174.44    151174.44   -9768.7152    637.66191    637.66191            0 
+Loop time of 1.46627e-05 on 16 procs for 0 steps with 64 atoms
+
+91.2% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 1.466e-05  |            |       |100.00
+
+Nlocal:        4.00000 ave           7 max           2 min
+Histogram: 1 0 5 0 5 0 4 0 0 1
+Nghost:        328.500 ave         351 max         302 min
+Histogram: 1 2 1 3 1 0 1 1 4 2
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      306.625 ave         541 max         145 min
+Histogram: 1 0 5 2 3 2 2 0 0 1
+
+Total # of neighbors = 4906
+Ave neighs/atom = 76.656250
+Neighbor list builds = 0
+Dangerous builds = 0
+
+# ---------------- Step 1: hold at t_randomize for randomize_timesteps ----------------
+fix integrator all nve
+fix thermostat all langevin ${t_randomize} ${t_randomize} 0.1 ${rand}
+fix thermostat all langevin 9000 ${t_randomize} 0.1 ${rand}
+fix thermostat all langevin 9000 9000 0.1 ${rand}
+fix thermostat all langevin 9000 9000 0.1 32375
+
+if "$(step) < ${Nrun1}" then "run ${Nrun1} upto"
+run ${Nrun1} upto
+run 3000 upto
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+       0            0         5000         5000    151174.44    151174.44   -9768.7152    637.66191    637.66191            0 
+     100    4.9904737    11537.959    11537.959    212918.65    212918.65   -9932.9408    637.66191    637.66191     12.48541 
+     200    9.9563134    11847.225    11847.225    11777.289    11777.289   -9953.3738    637.66191    637.66191    21.684828 
+     300    14.564724    9948.8693    9948.8693     60660.11     60660.11   -9962.9584    637.66191    637.66191    31.182627 
+     400    19.880764    8549.2669    8549.2669    15616.266    15616.266   -9966.9935    637.66191    637.66191    37.486129 
+     500    24.464452    8383.7218    8383.7218    105807.15    105807.15    -9976.718    637.66191    637.66191    40.280055 
+     600     28.95121    7872.3133    7872.3133     125632.7     125632.7   -9970.8531    637.66191    637.66191    45.854832 
+     700    33.931152     9485.819     9485.819    88093.731    88093.731   -9973.1485    637.66191    637.66191    51.183561 
+     800    39.031907    8119.3897    8119.3897   -15149.796   -15149.796   -9961.0172    637.66191    637.66191    54.585237 
+     900    43.556785    9708.9691    9708.9691    196795.13    196795.13   -9966.8274    637.66191    637.66191    59.453386 
+    1000    48.548712    9940.3413    9940.3413    54764.239    54764.239   -9964.9056    637.66191    637.66191    66.097837 
+    1100    53.442655     9802.796     9802.796   -6439.4007   -6439.4007   -9974.5547    637.66191    637.66191     70.76931 
+    1200    58.219019     9089.033     9089.033    12872.791    12872.791   -9969.2437    637.66191    637.66191    74.537409 
+    1300    63.585148    9821.8119    9821.8119    150256.06    150256.06   -9958.2725    637.66191    637.66191    81.662917 
+    1400    68.487194    8970.4351    8970.4351    130813.23    130813.23   -9962.6969    637.66191    637.66191    90.316205 
+    1500    73.571156    9068.7168    9068.7168    75292.322    75292.322    -9949.935    637.66191    637.66191    96.631581 
+    1600    78.179585    8650.8599    8650.8599    109438.36    109438.36   -9961.1398    637.66191    637.66191      102.331 
+    1700    83.076252     8969.423     8969.423    107908.52    107908.52   -9961.6819    637.66191    637.66191    103.74969 
+    1800     87.95345     8463.468     8463.468    175067.58    175067.58   -9956.1096    637.66191    637.66191    106.79294 
+    1900    93.647732    8338.6576    8338.6576    138758.11    138758.11   -9956.3589    637.66191    637.66191    114.20394 
+    2000    99.052705    9609.7577    9609.7577    122757.24    122757.24    -9976.446    637.66191    637.66191    119.93198 
+    2100    104.26516    8233.7641    8233.7641    60125.121    60125.121   -9966.0629    637.66191    637.66191    127.19802 
+    2200    109.10316    9016.0456    9016.0456    30462.944    30462.944   -9973.4404    637.66191    637.66191    130.89703 
+    2300    114.06104     8919.614     8919.614    29344.952    29344.952   -9969.3724    637.66191    637.66191    137.02963 
+    2400    118.89536    8528.0994    8528.0994    138413.19    138413.19   -9965.5331    637.66191    637.66191    142.26653 
+    2500    124.10493    9026.7816    9026.7816    147425.92    147425.92   -9966.3328    637.66191    637.66191    145.77213 
+    2600    129.07946    7697.1303    7697.1303    11824.015    11824.015   -9956.9941    637.66191    637.66191    153.51129 
+    2700    134.33597    9608.3872    9608.3872    28440.785    28440.785   -9964.8831    637.66191    637.66191    157.02036 
+    2800    140.02405    8590.6288    8590.6288    27428.108    27428.108   -9952.2039    637.66191    637.66191    160.34894 
+    2900    145.08827    8355.0732    8355.0732    172811.95    172811.95   -9963.9575    637.66191    637.66191     162.8912 
+    3000    150.00164    7508.2074    7508.2074    51672.756    51672.756   -9969.5139    637.66191    637.66191    167.88993 
+Loop time of 150.002 on 16 procs for 3000 steps with 64 atoms
+
+Performance: 1.728 ns/day, 13.889 hours/ns, 20.000 timesteps/s
+97.3% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 86.329     | 96.495     | 109.5      |  59.1 | 64.33
+Neigh   | 0.0049973  | 0.0054033  | 0.0057256  |   0.2 |  0.00
+Comm    | 40.401     | 53.401     | 63.571     |  79.4 | 35.60
+Output  | 0.010402   | 0.010446   | 0.010882   |   0.1 |  0.01
+Modify  | 0.052799   | 0.060479   | 0.067651   |   1.8 |  0.04
+Other   |            | 0.02943    |            |       |  0.02
+
+Nlocal:        4.00000 ave           7 max           2 min
+Histogram: 2 0 4 0 5 0 3 0 1 1
+Nghost:        334.625 ave         347 max         317 min
+Histogram: 1 0 1 1 1 2 5 2 1 2
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      309.500 ave         548 max         151 min
+Histogram: 2 1 3 3 2 1 2 1 0 1
+
+Total # of neighbors = 4952
+Ave neighs/atom = 77.375000
+Neighbor list builds = 242
+Dangerous builds = 0
+unfix thermostat
+unfix integrator
+
+# ---------------- Step 2: hold at t_melt for melt_timesteps ----------------
+fix integrator all nve
+fix thermostat all langevin ${t_melt} ${t_melt} 0.1 ${rand}
+fix thermostat all langevin 5000 ${t_melt} 0.1 ${rand}
+fix thermostat all langevin 5000 5000 0.1 ${rand}
+fix thermostat all langevin 5000 5000 0.1 32375
+
+if "$(step) < ${Nrun2}" then "run ${Nrun2} upto start ${Nrun1} stop ${Nrun2}"
+run ${Nrun2} upto start ${Nrun1} stop ${Nrun2}
+run 6000 upto start ${Nrun1} stop ${Nrun2}
+run 6000 upto start 3000 stop ${Nrun2}
+run 6000 upto start 3000 stop 6000
+Per MPI rank memory allocation (min/avg/max) = 4.843 | 4.843 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+    3000            0    7508.2074    7508.2074    51672.756    51672.756   -9969.5139    637.66191    637.66191    167.88993 
+    3100    4.6724205    6080.9545    6080.9545   -17892.058   -17892.058   -9985.0658    637.66191    637.66191    171.99114 
+    3200    9.7046852    5655.2212    5655.2212    9848.8072    9848.8072   -9995.3365    637.66191    637.66191    179.49123 
+    3300    14.733373    5466.1545    5466.1545    30204.866    30204.866   -9998.8101    637.66191    637.66191     179.6264 
+    3400    19.369282    6269.6032    6269.6032    67956.236    67956.236    -10002.97    637.66191    637.66191    179.81213 
+    3500    24.513652    5893.7875    5893.7875    121757.98    121757.98   -10015.811    637.66191    637.66191    183.44724 
+    3600    29.507598    5364.5112    5364.5112   -17798.668   -17798.668    -10011.65    637.66191    637.66191    184.13704 
+    3700    34.036637    4888.4766    4888.4766    57062.682    57062.682   -10009.613    637.66191    637.66191    187.56147 
+    3800     39.27338     5541.018     5541.018     55407.99     55407.99   -10015.232    637.66191    637.66191    187.63702 
+    3900    44.858558    5333.6878    5333.6878    79329.111    79329.111   -10009.151    637.66191    637.66191    185.73539 
+    4000    50.241565    4367.7391    4367.7391   -22938.508   -22938.508   -10006.964    637.66191    637.66191    183.75029 
+    4100    55.079722    4721.0072    4721.0072   -88672.462   -88672.462   -10010.201    637.66191    637.66191    182.77834 
+    4200     59.98136    4582.3883    4582.3883   -55405.481   -55405.481   -10006.558    637.66191    637.66191    181.79299 
+    4300    64.834373    5656.5197    5656.5197   -10442.617   -10442.617   -10010.618    637.66191    637.66191    180.91658 
+    4400    70.731632    5364.0645    5364.0645   -42878.453   -42878.453   -10011.604    637.66191    637.66191    179.79051 
+    4500    76.231573    5129.9192    5129.9192    16691.453    16691.453   -10008.237    637.66191    637.66191    180.12114 
+    4600    82.006169    5503.6012    5503.6012    5443.5683    5443.5683   -10006.503    637.66191    637.66191    181.42992 
+    4700    86.804176    5277.3112    5277.3112   -614.06029   -614.06029   -10012.174    637.66191    637.66191    184.70075 
+    4800    91.914468    5218.7398    5218.7398    69946.176    69946.176   -10010.307    637.66191    637.66191    185.15338 
+    4900     97.36072    5071.8798    5071.8798    46433.739    46433.739   -10015.391    637.66191    637.66191    186.84197 
+    5000    103.66559    4894.8286    4894.8286    75779.127    75779.127   -10017.034    637.66191    637.66191    187.88593 
+    5100    109.77555    4838.9763    4838.9763    23776.064    23776.064   -10013.702    637.66191    637.66191    188.21072 
+    5200    115.71225    5207.1169    5207.1169   -23530.795   -23530.795   -10008.583    637.66191    637.66191    189.64047 
+    5300    121.46984    5675.8153    5675.8153    50432.948    50432.948    -10012.22    637.66191    637.66191    193.17205 
+    5400    126.76642    5609.8721    5609.8721    9212.0007    9212.0007   -10004.102    637.66191    637.66191    195.73784 
+    5500    132.15424    5679.6862    5679.6862    8176.6505    8176.6505   -10009.404    637.66191    637.66191    197.71704 
+    5600    137.27855    5143.4018    5143.4018    128054.47    128054.47   -10021.545    637.66191    637.66191    197.49483 
+    5700    142.76164    4519.1755    4519.1755    83607.965    83607.965   -10019.387    637.66191    637.66191     196.0531 

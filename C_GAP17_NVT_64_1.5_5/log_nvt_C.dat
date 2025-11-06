@@ -1,0 +1,571 @@
+
+units ${units}
+units metal
+atom_style atomic
+
+if "${restart_from} == data" then "read_data ${data_file}"
+read_data ${data_file}
+read_data C_GAP17_NVT_64_1.5_5/1.5_gcm
+Reading data file ...
+  orthogonal box = (0.0000000 0.0000000 0.0000000) to (9.4734842 9.4734842 9.4734842)
+  2 by 2 by 4 MPI processor grid
+  reading atoms ...
+  64 atoms
+  read_data CPU = 0.003 seconds
+if "${restart_from} == data" then "reset_timestep 0"
+reset_timestep 0
+if "${restart_from} == continuation" then "read_restart ${rundir}/restart_nvt_${system}.*"
+
+mass 1 12.011
+pair_style ${pair_style}
+pair_style quip
+pair_coeff ${pair_coeff}
+pair_coeff * * /home/omega/vld/scat9451/main_project/carbon.xml "" 6
+#pair_coeff * * carbon.xml "Potential xml_label=GAP_2017_1_20_0_21_37_48_267" 6
+
+neighbor 2.0 bin
+neigh_modify every 1 delay 0 check yes
+
+variable Nfreq equal 100
+variable Nprint equal 100
+variable Nevery equal 100
+variable Nrepeat equal ${Nfreq}/${Nevery}
+variable Nrepeat equal 100/${Nevery}
+variable Nrepeat equal 100/100
+variable Ndump equal 100
+variable nAtoms equal atoms
+
+group carbon type 1
+64 atoms in group carbon
+
+timestep 0.001
+
+fix removeMomentum all momentum 1 linear 1 1 1
+
+compute T all temp
+fix TempAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} c_T
+fix TempAve all ave/time 100 ${Nrepeat} ${Nfreq} c_T
+fix TempAve all ave/time 100 1 ${Nfreq} c_T
+fix TempAve all ave/time 100 1 100 c_T
+
+variable P equal press
+fix PressAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} v_P
+fix PressAve all ave/time 100 ${Nrepeat} ${Nfreq} v_P
+fix PressAve all ave/time 100 1 ${Nfreq} v_P
+fix PressAve all ave/time 100 1 100 v_P
+
+variable v equal vol
+fix vAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} v_v
+fix vAve all ave/time 100 ${Nrepeat} ${Nfreq} v_v
+fix vAve all ave/time 100 1 ${Nfreq} v_v
+fix vAve all ave/time 100 1 100 v_v
+
+compute PE all pe pair
+fix PEAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} c_PE
+fix PEAve all ave/time 100 ${Nrepeat} ${Nfreq} c_PE
+fix PEAve all ave/time 100 1 ${Nfreq} c_PE
+fix PEAve all ave/time 100 1 100 c_PE
+compute PEa all pe/atom pair
+
+compute MSD all msd
+
+thermo_style custom step cpu temp f_TempAve press f_PressAve f_PEAve vol f_vAve c_MSD[4]
+thermo_modify flush yes
+
+thermo ${Nfreq}
+thermo 100
+
+#dump traj       all atom ${Ndump}  ${rundir}/NVT/dump_nvt_${system}.*.dat
+dump 1 all custom ${Ndump} ${rundir}/NVT/dump_custom.${system}.*.dat id type x y z fx fy fz c_PEa
+dump 1 all custom 100 ${rundir}/NVT/dump_custom.${system}.*.dat id type x y z fx fy fz c_PEa
+dump 1 all custom 100 C_GAP17_NVT_64_1.5_5/NVT/dump_custom.${system}.*.dat id type x y z fx fy fz c_PEa
+dump 1 all custom 100 C_GAP17_NVT_64_1.5_5/NVT/dump_custom.C.*.dat id type x y z fx fy fz c_PEa
+dump_modify 1 pad 5
+
+restart ${Ndump} ${rundir}/restart/restart_nvt_${system}.*
+restart 100 ${rundir}/restart/restart_nvt_${system}.*
+restart 100 C_GAP17_NVT_64_1.5_5/restart/restart_nvt_${system}.*
+restart 100 C_GAP17_NVT_64_1.5_5/restart/restart_nvt_C.*
+
+# Compute cumulative run lengths so we can use run ... upto
+variable Nrun1 equal ${randomize_timesteps}                             # hold at t_randomize
+variable Nrun1 equal 3000                             
+variable Nrun2 equal (${Nrun1}+${melt_timesteps})                       # hold at t_melt
+variable Nrun2 equal (3000+${melt_timesteps})                       
+variable Nrun2 equal (3000+3000)                       
+variable Nrun3 equal (${Nrun2}+${cool_timesteps})                       # end of ramp to t_cool
+variable Nrun3 equal (6000+${cool_timesteps})                       
+variable Nrun3 equal (6000+500)                       
+variable Nrun4 equal (${Nrun3}+${anneal_timesteps})                     # end of anneal (total run length)
+variable Nrun4 equal (6500+${anneal_timesteps})                     
+variable Nrun4 equal (6500+3000)                     
+
+if "${melt_timesteps} > 0 && $(step) == 0" then "velocity all create ${t_melt} ${rand}"
+velocity all create ${t_melt} ${rand}
+velocity all create 5000 ${rand}
+velocity all create 5000 21172
+
+run 0
+Neighbor list info ...
+  update every 1 steps, delay 0 steps, check yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 5.7
+  ghost atom cutoff = 5.7
+  binsize = 2.85, bins = 4 4 4
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair quip, perpetual
+      attributes: full, newton on
+      pair build: full/bin/atomonly
+      stencil: full/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.842 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+       0            0         5000         5000   -157885.86   -157885.86   -9821.8734    850.21588    850.21588            0 
+Loop time of 7.00355e-06 on 16 procs for 0 steps with 64 atoms
+
+89.2% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 7.004e-06  |            |       |100.00
+
+Nlocal:        4.00000 ave           5 max           3 min
+Histogram: 4 0 0 0 0 8 0 0 0 4
+Nghost:        269.125 ave         291 max         253 min
+Histogram: 4 1 2 2 1 1 1 0 3 1
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      230.875 ave         297 max         166 min
+Histogram: 3 1 0 0 6 2 0 0 1 3
+
+Total # of neighbors = 3694
+Ave neighs/atom = 57.718750
+Neighbor list builds = 0
+Dangerous builds = 0
+
+# ---------------- Step 1: hold at t_randomize for randomize_timesteps ----------------
+fix integrator all nve
+fix thermostat all langevin ${t_randomize} ${t_randomize} 0.1 ${rand}
+fix thermostat all langevin 9000 ${t_randomize} 0.1 ${rand}
+fix thermostat all langevin 9000 9000 0.1 ${rand}
+fix thermostat all langevin 9000 9000 0.1 21172
+
+if "$(step) < ${Nrun1}" then "run ${Nrun1} upto"
+run ${Nrun1} upto
+run 3000 upto
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.842 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+       0            0         5000         5000   -157885.86   -157885.86   -9821.8734    850.21588    850.21588            0 
+     100    4.1560931    11598.868    11598.868   -6543.8372   -6543.8372   -9951.6468    850.21588    850.21588    7.7784507 
+     200    8.4491451    10336.172    10336.172    54051.269    54051.269   -9962.4009    850.21588    850.21588    15.505445 
+     300    12.321994    9155.3906    9155.3906    53131.903    53131.903   -9957.5974    850.21588    850.21588    20.959722 
+     400     16.42274    7988.1681    7988.1681    59833.385    59833.385   -9957.3713    850.21588    850.21588    25.172975 
+     500    20.678715    8924.6542    8924.6542   -8672.2059   -8672.2059   -9965.8782    850.21588    850.21588     32.15633 
+     600    24.848119    9656.9244    9656.9244    75444.666    75444.666    -9970.963    850.21588    850.21588    37.571707 
+     700    28.793396    8991.3563    8991.3563     4670.865     4670.865   -9975.7279    850.21588    850.21588    44.647514 
+     800    33.508126    8210.4145    8210.4145    14471.263    14471.263    -9961.356    850.21588    850.21588    45.734857 
+     900    37.832405    8267.3547    8267.3547    30000.929    30000.929   -9948.7332    850.21588    850.21588     48.00458 
+    1000    41.856923    11459.254    11459.254    139238.36    139238.36   -9961.2166    850.21588    850.21588    54.731522 
+    1100    46.161368    9085.0629    9085.0629    35472.573    35472.573   -9955.1986    850.21588    850.21588    62.755772 
+    1200    50.660992    9832.3392    9832.3392    3589.9674    3589.9674   -9959.6709    850.21588    850.21588    65.211413 
+    1300    55.140629    9187.1629    9187.1629    54367.574    54367.574    -9958.607    850.21588    850.21588    68.456156 
+    1400     59.33609    9553.7689    9553.7689   -9124.4124   -9124.4124   -9953.4034    850.21588    850.21588    72.434417 
+    1500     63.88463    7927.4677    7927.4677    15465.851    15465.851   -9958.6503    850.21588    850.21588    78.353021 
+    1600    68.000286    8737.7196    8737.7196    55507.898    55507.898   -9964.3658    850.21588    850.21588    82.490911 
+    1700    72.512058    8868.2825    8868.2825   -16830.564   -16830.564   -9955.8737    850.21588    850.21588    88.525881 
+    1800    76.873045    10080.039    10080.039   -6171.4691   -6171.4691   -9961.4014    850.21588    850.21588    95.381861 
+    1900    81.476822    11032.867    11032.867    35379.834    35379.834   -9957.6863    850.21588    850.21588    102.42464 
+    2000    86.316501    9833.6879    9833.6879    41470.135    41470.135    -9963.247    850.21588    850.21588    111.55118 
+    2100    90.674335    9870.6407    9870.6407    80058.306    80058.306   -9966.8402    850.21588    850.21588    121.46711 
+    2200    94.833122    8903.0186    8903.0186    22566.094    22566.094   -9962.9764    850.21588    850.21588    122.41248 
+    2300    99.269357    8238.2168    8238.2168   -11575.669   -11575.669   -9958.5633    850.21588    850.21588    128.88237 
+    2400    103.69185     8893.382     8893.382   -17730.332   -17730.332   -9964.4821    850.21588    850.21588    135.20134 
+    2500     107.9711    8491.9207    8491.9207   -34974.202   -34974.202   -9957.4676    850.21588    850.21588    141.82368 
+    2600    112.39906     10249.43     10249.43    72011.683    72011.683   -9957.9596    850.21588    850.21588    145.16129 
+    2700    116.81329    9586.1968    9586.1968    37055.526    37055.526    -9969.561    850.21588    850.21588    153.19981 
+    2800    121.63089    7464.0813    7464.0813    20089.833    20089.833   -9955.3721    850.21588    850.21588    150.03421 
+    2900    126.01803    8410.3543    8410.3543   -45653.623   -45653.623   -9963.0894    850.21588    850.21588    153.62707 
+    3000    130.24461    8717.4201    8717.4201    18791.919    18791.919   -9965.0189    850.21588    850.21588    162.14845 
+Loop time of 130.245 on 16 procs for 3000 steps with 64 atoms
+
+Performance: 1.990 ns/day, 12.060 hours/ns, 23.034 timesteps/s
+97.0% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 74.111     | 81.006     | 88.379     |  49.0 | 62.20
+Neigh   | 0.0043776  | 0.0047083  | 0.0049999  |   0.3 |  0.00
+Comm    | 41.676     | 49.092     | 56.027     |  63.0 | 37.69
+Output  | 0.010739   | 0.010798   | 0.011294   |   0.1 |  0.01
+Modify  | 0.055206   | 0.10134    | 0.36332    |  28.9 |  0.08
+Other   |            | 0.02936    |            |       |  0.02
+
+Nlocal:        4.00000 ave           7 max           0 min
+Histogram: 2 0 2 0 1 4 0 3 2 2
+Nghost:        257.062 ave         298 max         217 min
+Histogram: 2 0 1 2 4 2 2 1 0 2
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      233.125 ave         410 max           0 min
+Histogram: 2 0 2 0 1 3 1 3 2 2
+
+Total # of neighbors = 3730
+Ave neighs/atom = 58.281250
+Neighbor list builds = 238
+Dangerous builds = 0
+unfix thermostat
+unfix integrator
+
+# ---------------- Step 2: hold at t_melt for melt_timesteps ----------------
+fix integrator all nve
+fix thermostat all langevin ${t_melt} ${t_melt} 0.1 ${rand}
+fix thermostat all langevin 5000 ${t_melt} 0.1 ${rand}
+fix thermostat all langevin 5000 5000 0.1 ${rand}
+fix thermostat all langevin 5000 5000 0.1 21172
+
+if "$(step) < ${Nrun2}" then "run ${Nrun2} upto start ${Nrun1} stop ${Nrun2}"
+run ${Nrun2} upto start ${Nrun1} stop ${Nrun2}
+run 6000 upto start ${Nrun1} stop ${Nrun2}
+run 6000 upto start 3000 stop ${Nrun2}
+run 6000 upto start 3000 stop 6000
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+    3000            0    8717.4201    8717.4201    18791.919    18791.919   -9965.0189    850.21588    850.21588    162.14845 
+    3100    3.9143953    5489.2084    5489.2084   -9450.7638   -9450.7638   -9987.8824    850.21588    850.21588    162.22413 
+    3200    8.3573182    5598.0162    5598.0162    16361.497    16361.497   -9996.1856    850.21588    850.21588     162.7162 
+    3300    12.764827    5083.3403    5083.3403    28396.907    28396.907    -9993.016    850.21588    850.21588    172.26382 
+    3400    16.877334    4943.4121    4943.4121   -33059.767   -33059.767    -9994.832    850.21588    850.21588    171.93308 
+    3500    21.049741     5388.583     5388.583    36775.559    36775.559   -9998.0287    850.21588    850.21588    174.78352 
+    3600    24.952783    4607.6169    4607.6169    2727.9996    2727.9996   -10003.739    850.21588    850.21588    173.39781 
+    3700    29.124352    5192.7247    5192.7247    2045.4845    2045.4845   -10006.218    850.21588    850.21588    173.60097 
+    3800    33.289391    4824.9354    4824.9354    53578.501    53578.501   -10011.893    850.21588    850.21588    178.10262 
+    3900    37.951064    4877.8014    4877.8014   -7974.0664   -7974.0664   -10005.396    850.21588    850.21588    180.16615 
+    4000    42.072111    4484.0665    4484.0665   -41143.904   -41143.904   -9998.3519    850.21588    850.21588    182.88274 
+    4100    46.110355    4725.1203    4725.1203   -27940.158   -27940.158   -9998.2072    850.21588    850.21588    185.84243 
+    4200     50.01747    5416.3722    5416.3722    102184.25    102184.25   -10001.011    850.21588    850.21588     181.9249 
+    4300    54.365039    5223.9017    5223.9017    50137.416    50137.416    -10000.21    850.21588    850.21588    179.56402 
+    4400    58.363432    4900.1326    4900.1326   -3943.7672   -3943.7672   -10000.921    850.21588    850.21588    185.18433 
+    4500      62.2865    5330.5334    5330.5334    -52838.53    -52838.53   -10003.862    850.21588    850.21588    184.25531 
+    4600    66.529602    4787.7678    4787.7678    7940.3738    7940.3738    -10007.24    850.21588    850.21588    184.22241 
+    4700    71.802284    4397.4515    4397.4515   -1734.8265   -1734.8265   -10014.005    850.21588    850.21588    189.93101 
+    4800    76.507947    4181.2133    4181.2133    58554.275    58554.275    -10014.21    850.21588    850.21588    190.58921 
+    4900    81.213183    4620.3923    4620.3923   -54507.784   -54507.784   -10014.824    850.21588    850.21588    192.87971 
+    5000    85.875458    4672.9367    4672.9367   -16748.736   -16748.736   -10011.116    850.21588    850.21588    193.96253 
+    5100    90.171246    5335.9047    5335.9047    46000.664    46000.664   -9991.4721    850.21588    850.21588    192.58091 
+    5200    94.876976    4821.7534    4821.7534     70079.91     70079.91   -10000.187    850.21588    850.21588    194.08351 
+    5300    99.001008    4778.8306    4778.8306    34533.318    34533.318   -9998.6282    850.21588    850.21588    196.08721 
+    5400    103.24565    4483.6865    4483.6865   -26084.535   -26084.535   -10001.301    850.21588    850.21588    197.21581 
+    5500     108.0906    5242.5074    5242.5074    25721.594    25721.594   -10001.658    850.21588    850.21588    195.35303 
+    5600    112.40189    4345.2384    4345.2384   -48975.491   -48975.491   -10009.576    850.21588    850.21588    194.65298 
+    5700    116.04281     4599.738     4599.738    38993.314    38993.314   -10006.913    850.21588    850.21588    193.79648 
+    5800    119.68331    4209.8845    4209.8845   -28166.384   -28166.384   -10007.282    850.21588    850.21588    198.54366 
+    5900    123.63227    5299.1938    5299.1938   -10884.858   -10884.858   -10003.701    850.21588    850.21588    193.73988 
+    6000    127.86392    5315.1377    5315.1377    6688.4172    6688.4172   -10002.994    850.21588    850.21588    195.56464 
+Loop time of 127.864 on 16 procs for 3000 steps with 64 atoms
+
+Performance: 2.027 ns/day, 11.839 hours/ns, 23.462 timesteps/s
+97.2% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 58.784     | 81.262     | 103.77     | 129.9 | 63.55
+Neigh   | 0.0024509  | 0.0031772  | 0.0038121  |   0.6 |  0.00
+Comm    | 23.996     | 46.457     | 68.421     | 170.8 | 36.33
+Output  | 0.010582   | 0.010626   | 0.011105   |   0.1 |  0.01
+Modify  | 0.054764   | 0.10275    | 0.61649    |  41.8 |  0.08
+Other   |            | 0.02855    |            |       |  0.02
+
+Nlocal:        4.00000 ave           7 max           1 min
+Histogram: 3 0 0 3 0 4 2 0 2 2
+Nghost:        264.062 ave         305 max         230 min
+Histogram: 1 1 3 2 4 1 0 2 0 2
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      229.500 ave         424 max          50 min
+Histogram: 3 0 1 2 4 0 2 1 1 2
+
+Total # of neighbors = 3672
+Ave neighs/atom = 57.375000
+Neighbor list builds = 162
+Dangerous builds = 0
+unfix thermostat
+unfix integrator
+
+# ---------------- Step 3: exponential quench from t_melt -> t_cool over cool_timesteps ----------------
+variable Tmelt equal ${t_melt}
+variable Tmelt equal 5000
+variable Tquench equal ${t_cool}
+variable Tquench equal 300
+variable k equal 7
+variable nsteps_quench equal ${cool_timesteps}
+variable nsteps_quench equal 500
+variable nchunks equal 5  # 500/5 = 100 steps per chunk to allow equilibration
+variable chunk_size equal ${nsteps_quench}/${nchunks}
+variable chunk_size equal 500/${nchunks}
+variable chunk_size equal 500/5
+variable ichunk loop ${nchunks}
+variable ichunk loop 5
+
+label quench_loop
+variable frac equal (v_ichunk-1.0)/(v_nchunks-1.0)
+variable Tcurrent equal v_Tquench+(v_Tmelt-v_Tquench)*exp(-v_k*v_frac)
+
+fix integrator all nve
+fix thermostat all langevin ${Tcurrent} ${Tcurrent} 0.01 ${rand} # tighter thermostat control for quench
+fix thermostat all langevin 5000 ${Tcurrent} 0.01 ${rand} 
+fix thermostat all langevin 5000 5000 0.01 ${rand} 
+fix thermostat all langevin 5000 5000 0.01 21172 
+run ${chunk_size}
+run 100
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+    6000            0    5315.1377    5315.1377    6688.4172    6688.4172   -10002.994    850.21588    850.21588    195.56464 
+    6100    4.3359408    5110.7157    5110.7157    17283.788    17283.788   -10003.387    850.21588    850.21588    198.71936 
+Loop time of 4.33597 on 16 procs for 100 steps with 64 atoms
+
+Performance: 1.993 ns/day, 12.044 hours/ns, 23.063 timesteps/s
+97.2% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.5378     | 2.5728     | 3.9876     |  60.3 | 59.34
+Neigh   | 5.0068e-05 | 7.6205e-05 | 0.0001111  |   0.0 |  0.00
+Comm    | 0.34504    | 1.7598     | 3.7946     |  72.9 | 40.59
+Output  | 0.00036383 | 0.00036506 | 0.00037909 |   0.0 |  0.01
+Modify  | 0.0016627  | 0.0018811  | 0.0022271  |   0.4 |  0.04
+Other   |            | 0.001011   |            |       |  0.02
+
+Nlocal:        4.00000 ave           9 max           2 min
+Histogram: 5 0 6 0 3 1 0 0 0 1
+Nghost:        262.875 ave         303 max         215 min
+Histogram: 1 0 3 2 1 2 2 2 1 2
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      230.625 ave         531 max         103 min
+Histogram: 5 0 5 1 3 1 0 0 0 1
+
+Total # of neighbors = 3690
+Ave neighs/atom = 57.656250
+Neighbor list builds = 4
+Dangerous builds = 0
+unfix thermostat
+unfix integrator
+
+next ichunk
+jump SELF quench_loop
+variable frac equal (v_ichunk-1.0)/(v_nchunks-1.0)
+variable Tcurrent equal v_Tquench+(v_Tmelt-v_Tquench)*exp(-v_k*v_frac)
+
+fix integrator all nve
+fix thermostat all langevin ${Tcurrent} ${Tcurrent} 0.01 ${rand} # tighter thermostat control for quench
+fix thermostat all langevin 1116.73753421709 ${Tcurrent} 0.01 ${rand} 
+fix thermostat all langevin 1116.73753421709 1116.73753421709 0.01 ${rand} 
+fix thermostat all langevin 1116.73753421709 1116.73753421709 0.01 21172 
+run ${chunk_size}
+run 100
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+    6100            0    5110.7157    5110.7157    17283.788    17283.788   -10003.387    850.21588    850.21588    198.71936 
+    6200    4.6319604    1115.1817    1115.1817    4670.2079    4670.2079   -10040.641    850.21588    850.21588    198.40854 
+Loop time of 4.63199 on 16 procs for 100 steps with 64 atoms
+
+Performance: 1.865 ns/day, 12.867 hours/ns, 21.589 timesteps/s
+97.2% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.6073     | 2.6159     | 4.619      |  50.8 | 56.47
+Neigh   | 2.3842e-05 | 4.074e-05  | 6.628e-05  |   0.0 |  0.00
+Comm    | 0.01003    | 2.013      | 3.0214     |  57.9 | 43.46
+Output  | 0.00034738 | 0.00034906 | 0.00036502 |   0.0 |  0.01
+Modify  | 0.0015907  | 0.0017879  | 0.0020871  |   0.3 |  0.04
+Other   |            | 0.0009408  |            |       |  0.02
+
+Nlocal:        4.00000 ave           7 max           1 min
+Histogram: 1 2 0 3 0 5 2 0 1 2
+Nghost:        257.688 ave         299 max         208 min
+Histogram: 2 0 1 2 2 0 4 2 1 2
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      230.250 ave         406 max          63 min
+Histogram: 1 2 1 2 4 1 1 2 0 2
+
+Total # of neighbors = 3684
+Ave neighs/atom = 57.562500
+Neighbor list builds = 2
+Dangerous builds = 0
+unfix thermostat
+unfix integrator
+
+next ichunk
+jump SELF quench_loop
+variable frac equal (v_ichunk-1.0)/(v_nchunks-1.0)
+variable Tcurrent equal v_Tquench+(v_Tmelt-v_Tquench)*exp(-v_k*v_frac)
+
+fix integrator all nve
+fix thermostat all langevin ${Tcurrent} ${Tcurrent} 0.01 ${rand} # tighter thermostat control for quench
+fix thermostat all langevin 441.927702084897 ${Tcurrent} 0.01 ${rand} 
+fix thermostat all langevin 441.927702084897 441.927702084897 0.01 ${rand} 
+fix thermostat all langevin 441.927702084897 441.927702084897 0.01 21172 
+run ${chunk_size}
+run 100
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+    6200            0    1115.1817    1115.1817    4670.2079    4670.2079   -10040.641    850.21588    850.21588    198.40854 
+    6300    4.1663692    426.07806    426.07806    26038.266    26038.266    -10049.65    850.21588    850.21588    198.85191 
+Loop time of 4.1664 on 16 procs for 100 steps with 64 atoms
+
+Performance: 2.074 ns/day, 11.573 hours/ns, 24.002 timesteps/s
+97.4% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.5007     | 2.643      | 4.1566     |  49.0 | 63.44
+Neigh   | 1.0967e-05 | 1.9014e-05 | 3.171e-05  |   0.0 |  0.00
+Comm    | 0.0066841  | 1.5201     | 2.6621     |  64.6 | 36.48
+Output  | 0.0003469  | 0.00034834 | 0.00036407 |   0.0 |  0.01
+Modify  | 0.0016906  | 0.0019796  | 0.0023239  |   0.3 |  0.05
+Other   |            | 0.0009689  |            |       |  0.02
+
+Nlocal:        4.00000 ave           8 max           1 min
+Histogram: 1 4 0 0 7 0 0 2 1 1
+Nghost:        254.125 ave         296 max         208 min
+Histogram: 2 1 1 1 2 1 4 1 0 3
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      231.125 ave         443 max          63 min
+Histogram: 1 4 0 0 6 1 0 2 0 2
+
+Total # of neighbors = 3698
+Ave neighs/atom = 57.781250
+Neighbor list builds = 1
+Dangerous builds = 0
+unfix thermostat
+unfix integrator
+
+next ichunk
+jump SELF quench_loop
+variable frac equal (v_ichunk-1.0)/(v_nchunks-1.0)
+variable Tcurrent equal v_Tquench+(v_Tmelt-v_Tquench)*exp(-v_k*v_frac)
+
+fix integrator all nve
+fix thermostat all langevin ${Tcurrent} ${Tcurrent} 0.01 ${rand} # tighter thermostat control for quench
+fix thermostat all langevin 324.663336476152 ${Tcurrent} 0.01 ${rand} 
+fix thermostat all langevin 324.663336476152 324.663336476152 0.01 ${rand} 
+fix thermostat all langevin 324.663336476152 324.663336476152 0.01 21172 
+run ${chunk_size}
+run 100
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+    6300            0    426.07806    426.07806    26038.266    26038.266    -10049.65    850.21588    850.21588    198.85191 
+    6400    4.4879313    333.42858    333.42858    13246.458    13246.458   -10051.615    850.21588    850.21588    198.86943 
+Loop time of 4.48796 on 16 procs for 100 steps with 64 atoms
+
+Performance: 1.925 ns/day, 12.467 hours/ns, 22.282 timesteps/s
+97.3% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.4789     | 2.6405     | 4.4792     |  54.7 | 58.84
+Neigh   | 1.0967e-05 | 1.8954e-05 | 3.1471e-05 |   0.0 |  0.00
+Comm    | 0.0056806  | 1.8441     | 3.0053     |  65.4 | 41.09
+Output  | 0.00034022 | 0.0003417  | 0.00035429 |   0.0 |  0.01
+Modify  | 0.0017176  | 0.0020485  | 0.0024388  |   0.4 |  0.05
+Other   |            | 0.0009674  |            |       |  0.02
+
+Nlocal:        4.00000 ave           8 max           1 min
+Histogram: 1 4 1 0 4 3 0 1 1 1
+Nghost:        253.750 ave         292 max         209 min
+Histogram: 2 2 0 1 2 0 5 0 1 3
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      230.500 ave         439 max          61 min
+Histogram: 1 4 0 1 4 0 3 1 0 2
+
+Total # of neighbors = 3688
+Ave neighs/atom = 57.625000
+Neighbor list builds = 1
+Dangerous builds = 0
+unfix thermostat
+unfix integrator
+
+next ichunk
+jump SELF quench_loop
+variable frac equal (v_ichunk-1.0)/(v_nchunks-1.0)
+variable Tcurrent equal v_Tquench+(v_Tmelt-v_Tquench)*exp(-v_k*v_frac)
+
+fix integrator all nve
+fix thermostat all langevin ${Tcurrent} ${Tcurrent} 0.01 ${rand} # tighter thermostat control for quench
+fix thermostat all langevin 304.285845238106 ${Tcurrent} 0.01 ${rand} 
+fix thermostat all langevin 304.285845238106 304.285845238106 0.01 ${rand} 
+fix thermostat all langevin 304.285845238106 304.285845238106 0.01 21172 
+run ${chunk_size}
+run 100
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+    6400            0    333.42858    333.42858    13246.458    13246.458   -10051.615    850.21588    850.21588    198.86943 
+    6500    4.4725056    277.82484    277.82484     5810.451     5810.451   -10051.862    850.21588    850.21588    198.84078 
+Loop time of 4.47254 on 16 procs for 100 steps with 64 atoms
+
+Performance: 1.932 ns/day, 12.424 hours/ns, 22.359 timesteps/s
+97.3% CPU use with 16 MPI tasks x 1 OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 1.4362     | 2.6346     | 4.4636     |  54.6 | 58.91
+Neigh   | 1.1444e-05 | 1.8895e-05 | 3.1948e-05 |   0.0 |  0.00
+Comm    | 0.0057731  | 1.8345     | 3.0325     |  65.4 | 41.02
+Output  | 0.00035143 | 0.00035296 | 0.00036764 |   0.0 |  0.01
+Modify  | 0.0017226  | 0.0020218  | 0.0024362  |   0.4 |  0.05
+Other   |            | 0.001009   |            |       |  0.02
+
+Nlocal:        4.00000 ave           8 max           1 min
+Histogram: 1 4 0 0 6 2 0 1 1 1
+Nghost:        253.938 ave         290 max         208 min
+Histogram: 2 0 2 0 3 0 2 3 1 3
+Neighs:         0.00000 ave           0 max           0 min
+Histogram: 16 0 0 0 0 0 0 0 0 0
+FullNghs:      229.750 ave         441 max          61 min
+Histogram: 1 4 0 0 6 0 2 1 0 2
+
+Total # of neighbors = 3676
+Ave neighs/atom = 57.437500
+Neighbor list builds = 1
+Dangerous builds = 0
+unfix thermostat
+unfix integrator
+
+next ichunk
+jump SELF quench_loop
+
+# ---------------- Step 4: anneal at t_anneal for anneal_timesteps ----------------
+fix integrator all nve
+fix thermostat all langevin ${t_anneal} ${t_anneal} 0.1 ${rand}
+fix thermostat all langevin 300 ${t_anneal} 0.1 ${rand}
+fix thermostat all langevin 300 300 0.1 ${rand}
+fix thermostat all langevin 300 300 0.1 21172
+
+if "$(step) < ${Nrun4}" then "run ${Nrun4} upto start ${Nrun3} stop ${Nrun4}"
+run ${Nrun4} upto start ${Nrun3} stop ${Nrun4}
+run 9500 upto start ${Nrun3} stop ${Nrun4}
+run 9500 upto start 6500 stop ${Nrun4}
+run 9500 upto start 6500 stop 9500
+Per MPI rank memory allocation (min/avg/max) = 4.842 | 4.842 | 4.843 Mbytes
+Step CPU Temp f_TempAve Press f_PressAve f_PEAve Volume f_vAve c_MSD[4] 
+    6500            0    277.82484    277.82484     5810.451     5810.451   -10051.862    850.21588    850.21588    198.84078 
+    6600    4.4368021    271.98324    271.98324     6107.599     6107.599   -10051.915    850.21588    850.21588    198.83954 
+    6700     8.807915    326.24916    326.24916    5612.8983    5612.8983   -10051.923    850.21588    850.21588    199.07814 
+    6800    13.218186    335.80687    335.80687    19056.258    19056.258   -10052.401    850.21588    850.21588    199.44805 
