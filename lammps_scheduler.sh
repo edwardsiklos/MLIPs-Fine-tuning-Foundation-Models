@@ -89,8 +89,13 @@ cd $TMPDIR  # use the temporary directory local to the compute node. This avoids
 # writing output over the network filesystem, which is slow for you and slows down
 # the NFS for everyone else (especially as jobs get larger)
 
+# Generate random seed between 1 and 900 million for the Marsaglia random # generator
+# --- Generate a valid random seed: 1 < RAND_SEED < 900000000 ---
+seed_raw=$(od -An -N4 -tu4 /dev/urandom | tr -d '[:space:]')
+RAND_SEED=$(( (seed_raw % 899999998) + 2 ))  # 2..899999999 inclusive
+
 mpirun -np $NMPI $lmp_exec -in ${lmp_in} \
-   -var rand $(od -vAn -N4 -td4 < /dev/urandom | sed "s/-//") \
+   -var rand ${RAND_SEED} \
    -var system ${system} \
    -var units ${units} \
    -var pair_style "${pair_style}" \
