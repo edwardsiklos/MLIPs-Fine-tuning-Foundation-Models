@@ -1,6 +1,6 @@
 #!/bin/bash 
 #$ -cwd
-#$ -pe smp 16
+#$ -pe smp 128
 #$ -l s_rt=12:00:00
 #$ -j y
 #$ -o $JOB_ID.log
@@ -21,7 +21,7 @@ export DIR=$(pwd)
 # all input files and the lammps executable should be in the project directory
 
 restart=data # choose either data or continuation as starting structure for run
-lmp_in=$DIR/in_nvt # lammps infile, for constant 'NVT' ensemble MD
+lmp_in=$DIR/in_nvt_mace-mp-0b3 # lammps infile, for constant 'NVT' ensemble MD
 #lmp_exec=$DIR/lmp_mpi # LAMMPS executable binary file
 lmp_exec=$DIR/Excecutables/graph_pes_lmp # LAMMPS executable binary file
 
@@ -80,7 +80,7 @@ units=metal
 pot=$DIR/Potentials/mace-mp-0b3.pt # filename for the GAP potential that you use for the simulation
 # make sure that the 'sparseX' file(s) are in the same directory as the .xml
 pair_style=graph_pes
-pair_coeff="* * ${pot} C
+pair_coeff="* * ${pot} C"
 
 INFILE="${rundir}"
 rsync -rltq $INFILE $TMPDIR/

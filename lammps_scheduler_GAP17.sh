@@ -21,7 +21,7 @@ export DIR=$(pwd)
 # all input files and the lammps executable should be in the project directory
 
 restart=data # choose either data or continuation as starting structure for run
-lmp_in=$DIR/in_nvt # lammps infile, for constant 'NVT' ensemble MD
+lmp_in=$DIR/in_nvt_GAP17 # lammps infile, for constant 'NVT' ensemble MD
 #lmp_exec=$DIR/lmp_mpi # LAMMPS executable binary file
 lmp_exec=$DIR/Excecutables/lmp_cpu_mpich_quip # LAMMPS executable binary file
 
