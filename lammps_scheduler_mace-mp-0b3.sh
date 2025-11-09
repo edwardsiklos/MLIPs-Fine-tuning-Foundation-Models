@@ -1,6 +1,6 @@
 #!/bin/bash 
 #$ -cwd
-#$ -pe smp 128
+#$ -pe smp 16
 #$ -l s_rt=12:00:00
 #$ -j y
 #$ -o $JOB_ID.log
@@ -12,9 +12,9 @@
 # -o choose $JOB_ID.log as the outfile
 
 # set PATH, LD_LIBRARY_PATH etc. for the intel libraries used to compile lammps 
-# Removed module load to due parellelizing failure for graph-pes potential
-# module load intel/2019
-# module load mpi/mpich-x86_64
+# Removed module load to due parellelizing failure for graph-pes potential (failed)
+module load intel/2019
+module load mpi/mpich-x86_64
 export DIR=$(pwd)
 
 #---------------------- Bits you may need to change ---------------------------------
@@ -93,7 +93,10 @@ cd $TMPDIR  # use the temporary directory local to the compute node. This avoids
 # --- Generate a valid random seed: 1 < RAND_SEED < 900000000 ---
 rand=$((1 + RANDOM % 900000000))
 
-mpirun -np $NMPI $lmp_exec -in ${lmp_in} \
+# Changed: mpirun -np $NMPI $lmp_exec -in ${lmp_in} \ 
+# to try and resolve parellelizing errors
+
+$lmp_exec -in ${lmp_in} \
    -var rand ${rand} \
    -var system ${system} \
    -var units ${units} \
