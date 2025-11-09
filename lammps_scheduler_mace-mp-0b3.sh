@@ -11,9 +11,10 @@
 # -j y merge stderr and stdout 
 # -o choose $JOB_ID.log as the outfile
 
-# set PATH, LD_LIBRARY_PATH etc. for the intel libraries used to compile lammps
-module load intel/2019
-module load mpi/mpich-x86_64
+# set PATH, LD_LIBRARY_PATH etc. for the intel libraries used to compile lammps 
+# Removed module load to due parellelizing failure for graph-pes potential
+# module load intel/2019
+# module load mpi/mpich-x86_64
 export DIR=$(pwd)
 
 #---------------------- Bits you may need to change ---------------------------------
