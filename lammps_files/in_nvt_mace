@@ -1,0 +1,118 @@
+#!/bin/bash 
+#timer timeout 0 every 1
+log ${rundir}/log_nvt_${system}.dat append
+
+units ${units}
+atom_style atomic
+
+newton off # required for graph-pes potentials
+
+if "${restart_from} == data" then "read_data ${data_file}"
+if "${restart_from} == data" then "reset_timestep 0"
+if "${restart_from} == continuation" then "read_restart ${rundir}/restart_nvt_${system}.*"
+
+mass 1 12.011
+pair_style ${pair_style}
+pair_coeff ${pair_coeff}
+#pair_coeff * * carbon.xml "Potential xml_label=GAP_2017_1_20_0_21_37_48_267" 6
+
+neighbor 2.0 bin 
+neigh_modify every 1 delay 0 check yes 
+
+variable Nfreq equal 100
+variable Nprint equal 100
+variable Nevery equal 100
+variable Nrepeat equal ${Nfreq}/${Nevery}
+variable Ndump equal 100 
+variable nAtoms equal atoms
+
+group carbon type 1
+
+timestep 0.001 
+
+fix removeMomentum all momentum 1 linear 1 1 1 
+
+compute T all temp 
+fix TempAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} c_T 
+
+variable P equal press 
+fix PressAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} v_P 
+
+variable v equal vol
+fix vAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} v_v
+
+compute PE all pe pair 
+fix PEAve all ave/time ${Nevery} ${Nrepeat} ${Nfreq} c_PE
+compute PEa all pe/atom pair
+
+compute MSD all msd
+
+thermo_style custom step cpu temp f_TempAve press f_PressAve f_PEAve vol f_vAve c_MSD[4] 
+thermo_modify flush yes
+
+thermo ${Nfreq}
+
+#dump traj       all atom ${Ndump}  ${rundir}/NVT/dump_nvt_${system}.*.dat 
+dump 1 all custom ${Ndump} ${rundir}/NVT/dump_custom.${system}.*.dat id type x y z fx fy fz c_PEa
+dump_modify 1 pad 5
+
+restart ${Ndump} ${rundir}/restart/restart_nvt_${system}.*
+
+# Compute cumulative run lengths so we can use run ... upto
+variable Nrun1 equal ${randomize_timesteps}                             # hold at t_randomize
+variable Nrun2 equal (${Nrun1}+${melt_timesteps})                       # hold at t_melt
+variable Nrun3 equal (${Nrun2}+${cool_timesteps})                       # end of ramp to t_cool
+variable Nrun4 equal (${Nrun3}+${anneal_timesteps})                     # end of anneal (total run length)
+
+if "${melt_timesteps} > 0 && $(step) == 0" then "velocity all create ${t_melt} ${rand}"
+
+run 0
+
+# ---------------- Step 1: hold at t_randomize for randomize_timesteps ----------------
+fix integrator all nve
+fix thermostat all langevin ${t_randomize} ${t_randomize} 0.1 ${rand}
+
+if "$(step) < ${Nrun1}" then "run ${Nrun1} upto"
+unfix thermostat
+unfix integrator
+
+# ---------------- Step 2: hold at t_melt for melt_timesteps ----------------
+fix integrator all nve
+fix thermostat all langevin ${t_melt} ${t_melt} 0.1 ${rand}
+
+if "$(step) < ${Nrun2}" then "run ${Nrun2} upto start ${Nrun1} stop ${Nrun2}"
+unfix thermostat
+unfix integrator
+
+# ---------------- Step 3: exponential quench from t_melt -> t_cool over cool_timesteps ----------------
+variable Tmelt equal ${t_melt}
+variable Tquench equal ${t_cool}
+variable k equal 7
+variable nsteps_quench equal ${cool_timesteps}
+variable nchunks equal 5  # 500/5 = 100 steps per chunk to allow equilibration
+variable chunk_size equal ${nsteps_quench}/${nchunks}
+variable ichunk loop ${nchunks}
+
+label quench_loop
+variable frac equal (v_ichunk-1.0)/(v_nchunks-1.0)
+variable Tcurrent equal v_Tquench+(v_Tmelt-v_Tquench)*exp(-v_k*v_frac)
+
+fix integrator all nve
+fix thermostat all langevin ${Tcurrent} ${Tcurrent} 0.01 ${rand} # tighter thermostat control for quench
+run ${chunk_size}
+unfix thermostat
+unfix integrator
+
+next ichunk
+jump SELF quench_loop
+
+# ---------------- Step 4: anneal at t_anneal for anneal_timesteps ----------------
+fix integrator all nve
+fix thermostat all langevin ${t_anneal} ${t_anneal} 0.1 ${rand}
+
+if "$(step) < ${Nrun4}" then "run ${Nrun4} upto start ${Nrun3} stop ${Nrun4}"
+unfix thermostat
+unfix integrator
+
+# Write Data
+write_data ${rundir}/out_data_quench_${system}
