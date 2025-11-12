@@ -1,5 +1,6 @@
 LAMMPS_simulations/
 Random_Carbon_Structures/
+Random_Silicon_Structures
 *.log
 Analysis/
 log.lammps
