@@ -25,6 +25,7 @@ errorbar.capsize: 1.5
 # Grid settings
 axes.grid : True
 axes.grid.which : both       # show both major and minor gridlines
+xtick.minor.visible : False
 
 # Make grid less visually dominant
 grid.alpha: 0.3
@@ -36,7 +37,8 @@ savefig.dpi : 600
 
 # Colour
 image.cmap: viridis
-axes.prop_cycle: cycler(color=["#004488", "#DDAA33", "#BB5566", "#117733"])
+axes.prop_cycle: "cycler('color', ['#2F2F2F', '#DDAA33', '#BB5566', '#117733']) + cycler('linestyle', ['-', '-', '--', ':'])"
+
 
 # Autofitting
 figure.autolayout : True
