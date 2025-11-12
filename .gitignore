@@ -5,6 +5,9 @@ Analysis/
 log.lammps
 test
 C_GAP17*
+C_mace*
 Misc_Functions.ipynb
-Excecutables/
+Executables/
 Potentials/
+CASTEP/
+.conda
