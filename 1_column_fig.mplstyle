@@ -21,6 +21,7 @@ patch.linewidth : 0.65       # thick lines (for outlines, boxes, etc.)
 # Markers and Error Bars
 lines.markersize: 1.5
 errorbar.capsize: 1.5
+lines.marker: "o"
 
 # Grid settings
 axes.grid : True
@@ -37,7 +38,7 @@ savefig.dpi : 600
 
 # Colour
 image.cmap: viridis
-axes.prop_cycle: "cycler('color', ['#2F2F2F', '#DDAA33', '#BB5566', '#117733']) + cycler('linestyle', ['-', '-', '--', ':'])"
+axes.prop_cycle: "cycler('color', ['#2F2F2F', '#DDAA33', '#BB5566', '#117733']) + cycler('linestyle', ['-', '--', '--', '--'])"
 
 
 # Autofitting
