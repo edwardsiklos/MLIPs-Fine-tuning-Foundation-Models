@@ -1,6 +1,6 @@
 #!/bin/bash 
 #$ -cwd
-#$ -pe smp 16
+#$ -pe smp 8
 #$ -l s_rt=18:00:00
 #$ -j y
 #$ -o $JOB_ID.log
