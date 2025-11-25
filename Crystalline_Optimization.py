@@ -250,7 +250,7 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
         with open(data_out_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(data, indent=2) + "\n")
     else:
-        print(f"Skipped writing: {data_out_path.name}")
+        print(f"Skipped: {data_out_path.name}")
 
     return energy_per_atom, data_out_path
 
@@ -325,7 +325,7 @@ energetics_analysis(
                     path_to_graphite_structure="Carbon_Structures/Graphite_mp169.cif",
                     path_to_isolated_atom="Carbon_Structures/isolated_C.cif",
                     fmax = 0.0001,
-                    steps = 500,
+                    steps = 1000,
                     OVERWRITE=set_OVERWRITE,
                     ref_traj_out_dir="Carbon_Structures/Relaxed_Reference_Structures",
                     traj_out_dir="Carbon_Structures/Crystalline/Relaxed",

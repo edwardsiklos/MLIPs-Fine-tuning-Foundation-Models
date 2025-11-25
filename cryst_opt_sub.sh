@@ -1,6 +1,6 @@
 #!/bin/bash
 #$ -cwd
-#$ -pe smp 8
+#$ -pe smp 4
 #$ -l s_rt=02:00:00
 #$ -j y
 #$ -o cryst_opt_$JOB_ID.log
