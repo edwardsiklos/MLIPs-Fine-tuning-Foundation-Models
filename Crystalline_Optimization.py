@@ -47,8 +47,10 @@ from graph_pes.utils.calculator import GraphPESCalculator
 from graph_pes.interfaces import mace_mp
 
 import ovito
-from ovito.modifiers import CreateBondsModifier, BondAnalysisModifier
 from ovito.io import import_file
+from ovito.modifiers import CreateBondsModifier, CoordinationAnalysisModifier, ColorCodingModifier, BondAnalysisModifier
+from ovito.vis import Viewport, TachyonRenderer, ColorLegendOverlay, BondsVis
+from ovito.qt_compat import QtCore
 from ovito.io.ase import ase_to_ovito
 from ovito.pipeline import Pipeline, StaticSource
 
@@ -151,11 +153,102 @@ def get_bond_lengths_and_angles(ase_atoms_object, cutoff, bins):
 
     return avg_bond_length, avg_bond_angle
 
+# Ovito rendering
+def ovito_analysis(traj_path, out_path):
+
+    # Clear existing pipeline
+    for p in list(ovito.scene.pipelines):
+        p.remove_from_scene()
+
+    pipeline = import_file(str(traj_path))
+
+    # Bond Modifier and Visuals 
+    bond_modifier = CreateBondsModifier(cutoff=1.85)
+    bond_modifier.vis.width = 0.15
+    bond_modifier.vis.coloring_mode = BondsVis.ColoringMode.Uniform
+    bond_modifier.vis.color = (0.5, 0.5, 0.5)
+    pipeline.modifiers.append(bond_modifier)
+
+    # Coordination Modifier and Colour Coding
+    pipeline.modifiers.append(CoordinationAnalysisModifier(cutoff=1.85))
+    colour_coding_mod = ColorCodingModifier(property="Coordination",start_value=1.0,end_value=4.0,gradient=ColorCodingModifier.Viridis(),discretize_color_map=True)
+    pipeline.modifiers.append(colour_coding_mod)
+
+    # Add to Scene
+    pipeline.add_to_scene()
+
+    # Viewing settings
+    vp = Viewport()
+    vp.type = Viewport.Type.Perspective
+    vp.camera_pos = (50, 0, 0)
+    vp.camera_dir = (-1, 0, 0)
+    vp.camera_up  = (0, 0, 1)
+
+    # Coordination Legend
+    legend = ColorLegendOverlay(
+        title = "Coordination",
+        modifier = colour_coding_mod,
+        alignment = QtCore.Qt.AlignmentFlag.AlignHCenter | QtCore.Qt.AlignmentFlag.AlignBottom,
+        orientation = QtCore.Qt.Orientation.Horizontal,
+        font_size = 0.1,
+        format_string = '%.0f' 
+        )
+    vp.overlays.append(legend)
+
+    tachyon = TachyonRenderer(shadows=False, direct_light_intensity=1.1)
+
+    # Set particle scaling (datafile specific)
+    n_frames = pipeline.source.num_frames
+    final_frame = max(0, n_frames - 1)
+    data = pipeline.compute(frame = final_frame)
+    data.particles.vis.scaling = 0.3
+
+    # Set Zoom
+    vp.zoom_all()
+    
+    # Ovito Files
+    out_path = str(out_path)
+
+    ovito_save_file = f"{out_path}.ovito"
+    if Path(ovito_save_file).exists():
+        print(f"Skipped {out_path}.ovito")
+    else:
+        ovito.scene.save(ovito_save_file)
+        print(f"Created {out_path}.ovito")
+
+    # Images    
+    img_save_file = f"{out_path}.png"
+    if Path(img_save_file).exists():
+        print(f"Skipped {out_path}.png")
+    else:
+        vp.render_image(size=(1920,1080),
+                        filename=img_save_file,
+                        background=(1,1,1),
+                        frame=final_frame,
+                        renderer=tachyon)
+        print(f"Created {out_path}.png")
+            
+    # Videos
+    vid_save_file   = f"{out_path}.avi"                                  
+    if Path(vid_save_file).exists():
+        print(f"Skipped {out_path}.avi")
+    else:
+        vp.render_anim(size=(1920,1080), 
+                    filename=vid_save_file, 
+                    fps=10,
+                    renderer=tachyon) 
+        print(f"Created {out_path}.avi")
+    # Remove modifiers
+    pipeline.modifiers.pop()
+    pipeline.modifiers.pop()
+    pipeline.modifiers.pop()
+
 # Relaxes a structure 
 # Creates .traj, .cif (final frame), .json
 # Returns energy/atom and .json file path
+# Return ovito renderings
 def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
-                         OVERWRITE, traj_out_dir, data_out_dir):
+                         OVERWRITE, traj_out_dir, data_out_dir, ovito_out_dir):
 
     path_to_structure = Path(path_to_structure)
 
@@ -169,7 +262,11 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
 
     traj_path = traj_dir / f"{Path(path_to_model).stem}_{path_to_structure.stem}.traj"
     final_frame_path = final_traj_dir / f"{Path(path_to_model).stem}_relaxed_{path_to_structure.stem}.cif"
-        
+    
+    ovito_out_dir = Path(ovito_out_dir)
+    ovito_out_dir.mkdir(parents=True, exist_ok=True)
+    ovito_out_path = ovito_out_dir / f"{Path(path_to_model).stem}_{path_to_structure.stem}"
+
     # Load model and calculator
     calc = load_model_and_calc(path_to_model)
 
@@ -196,9 +293,11 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
     else:
         print(f"Skipped relaxtion: {traj_path.stem}")        
 
+    # Ovito renders
+    ovito_analysis(traj_path, ovito_out_path)
+
     # Write final structure frame
     relaxed_structure = read(traj_path, index=-1)
-    
     if not final_frame_path.exists() or OVERWRITE:
         write(final_frame_path, relaxed_structure)
 
@@ -235,7 +334,7 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
         "lattice_parameter c"     : c,
         "lattice_parameter alpha" : alpha,
         "lattice_parameter beta"  : beta,
-        "lattice_parameter gamme" : gamma,
+        "lattice_parameter gamma" : gamma,
 
         "average_bond_length"     : avg_bond_length,
         "average_bond_angle"      : avg_bond_angle,
@@ -254,9 +353,9 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
     return e_bulk, n_atoms, data_out_path
 
 # Import structures and return .json with atomisation and formation energies
-def energetics_analysis(in_dir, path_to_models, path_to_graphite_structure,
+def analysis(in_dir, path_to_models, path_to_graphite_structure,
                         path_to_isolated_atom, fmax, steps, OVERWRITE,
-                        ref_traj_out_dir, traj_out_dir, data_out_dir):
+                        ref_traj_out_dir, traj_out_dir, data_out_dir, ovito_out_dir):
 
     # Import structures
     structure_paths = import_crystal_structures(in_dir)
@@ -270,11 +369,11 @@ def energetics_analysis(in_dir, path_to_models, path_to_graphite_structure,
         # Calculate graphite energy
         graphite_e_bulk,graphite_n_atoms,_ = relax_and_calculate(path_to_graphite_structure, path_to_model,
                                                         fmax, steps, OVERWRITE, ref_traj_out_dir,
-                                                        data_out_dir)
+                                                        data_out_dir, ovito_out_dir)
         # Calculate isolated atom energy
         isolated_e,n_isolated,_ = relax_and_calculate(path_to_isolated_atom, path_to_model, fmax, 
                                                          steps, OVERWRITE, ref_traj_out_dir, 
-                                                         data_out_dir)
+                                                         data_out_dir, ovito_out_dir)
         if n_isolated !=1:
             print(f"More than 1 atom counted in isolated atom file")
         # Relax imported structures
@@ -286,7 +385,7 @@ def energetics_analysis(in_dir, path_to_models, path_to_graphite_structure,
 
             e_bulk, n_atoms, data_out_path = relax_and_calculate(file_path, path_to_model, fmax, 
                                                                 steps, OVERWRITE, traj_out_dir, 
-                                                                data_out_dir)
+                                                                data_out_dir, ovito_out_dir)
 
             # Formation energy per atom
             formation_energy_per_atom = (e_bulk/n_atoms) - (graphite_e_bulk/graphite_n_atoms)
@@ -316,19 +415,21 @@ def energetics_analysis(in_dir, path_to_models, path_to_graphite_structure,
 models_to_analyse = ["MACE_Models/medium-0b3.pt", 
                      "MACE_Models/medium-mpa-0.pt",
                      "MACE_Models/medium-omat-0.pt",
-                     "Potentials/Carbon_GAP_20.xml"]    
+                     "Potentials/Carbon_GAP_20.xml",
+                     "Potentials/carbon.xml"]    
 
 set_OVERWRITE = False
 
-energetics_analysis(
-                    in_dir="/u/vld/scat9451/main_project/Carbon_Structures/Crystalline/Downloaded",
-                    path_to_models= models_to_analyse,
-                    path_to_graphite_structure="Carbon_Structures/Graphite_mp169.cif",
-                    path_to_isolated_atom="Carbon_Structures/isolated_C.cif",
-                    fmax = 0.0001,
-                    steps = 1000,
-                    OVERWRITE=set_OVERWRITE,
-                    ref_traj_out_dir="Carbon_Structures/Relaxed_Reference_Structures",
-                    traj_out_dir="Carbon_Structures/Crystalline/Relaxed",
-                    data_out_dir="Analysis/Crystalline Analysis/Raw Data"
-                    )
+analysis(
+    in_dir="/u/vld/scat9451/main_project/Carbon_Structures/Crystalline/Downloaded",
+    path_to_models= models_to_analyse,
+    path_to_graphite_structure="Carbon_Structures/Graphite_mp169.cif",
+    path_to_isolated_atom="Carbon_Structures/isolated_C.cif",
+    fmax = 0.0001,
+    steps = 1000,
+    OVERWRITE=set_OVERWRITE,
+    ref_traj_out_dir="Carbon_Structures/Relaxed_Reference_Structures",
+    traj_out_dir="Carbon_Structures/Crystalline/Relaxed",
+    data_out_dir="Analysis/Crystalline Analysis/Raw Data",
+    ovito_out_dir="Analysis/Crystalline Analysis/Ovito"
+    )

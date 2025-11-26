@@ -13,13 +13,11 @@ conda activate quippy
 
 # NOTE: 
 # This env is very sensitive and must have all numpy<2
-# Instructions for creating suitable env:
-
 # -------------------------------------------------------------------------------------------------------------
+# Instructions for creating suitable env:
 # conda create -n quippy python=3.10 -y
 # conda activate quippy
-# pip install quippy-ase
-# pip install "numpy<2" mace-torch graph-pes
+# pip install "numpy<2" quippy-ase mace-torch graph-pes
 # conda install --strict-channel-priority -c https://conda.ovito.org -c conda-forge "numpy<2" ovito=3.14.1 -y
 # -------------------------------------------------------------------------------------------------------------
 
@@ -27,7 +25,8 @@ conda activate quippy
 export OMP_NUM_THREADS=$NSLOTS
 export MKL_NUM_THREADS=$NSLOTS
 export OPENBLAS_NUM_THREADS=1 
-# To prevent: 
+
+# OPENBLAS_NUM_THREADS=1 used to prevent: 
 # OpenBLAS Warning : Detect OpenMP Loop and this application may hang. Please rebuild the library with USE_OPENMP=1 option.
 # This stops .xml file multithreading 
 
