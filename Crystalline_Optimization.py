@@ -247,7 +247,7 @@ def ovito_analysis(traj_path, out_path):
 # Creates .traj, .cif (final frame), .json
 # Returns energy/atom and .json file path
 # Return ovito renderings
-def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
+def relax_and_analyse(path_to_structure, path_to_model, fmax, steps,
                          OVERWRITE, traj_out_dir, data_out_dir, ovito_out_dir):
 
     path_to_structure = Path(path_to_structure)
@@ -263,9 +263,9 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
     traj_path = traj_dir / f"{Path(path_to_model).stem}_{path_to_structure.stem}.traj"
     final_frame_path = final_traj_dir / f"{Path(path_to_model).stem}_relaxed_{path_to_structure.stem}.cif"
     
-    ovito_out_dir = Path(ovito_out_dir)
+    ovito_out_dir = Path(ovito_out_dir) / path_to_structure.stem
     ovito_out_dir.mkdir(parents=True, exist_ok=True)
-    ovito_out_path = ovito_out_dir / f"{Path(path_to_model).stem}_{path_to_structure.stem}"
+    ovito_out_path = ovito_out_dir / Path(path_to_model).stem
 
     # Load model and calculator
     calc = load_model_and_calc(path_to_model)
@@ -367,11 +367,11 @@ def analysis(in_dir, path_to_models, path_to_graphite_structure,
     for path_to_model in path_to_models:
 
         # Calculate graphite energy
-        graphite_e_bulk,graphite_n_atoms,_ = relax_and_calculate(path_to_graphite_structure, path_to_model,
+        graphite_e_bulk,graphite_n_atoms,_ = relax_and_analyse(path_to_graphite_structure, path_to_model,
                                                         fmax, steps, OVERWRITE, ref_traj_out_dir,
                                                         data_out_dir, ovito_out_dir)
         # Calculate isolated atom energy
-        isolated_e,n_isolated,_ = relax_and_calculate(path_to_isolated_atom, path_to_model, fmax, 
+        isolated_e,n_isolated,_ = relax_and_analyse(path_to_isolated_atom, path_to_model, fmax, 
                                                          steps, OVERWRITE, ref_traj_out_dir, 
                                                          data_out_dir, ovito_out_dir)
         if n_isolated !=1:
@@ -383,7 +383,7 @@ def analysis(in_dir, path_to_models, path_to_graphite_structure,
         # Loop over all structures
         for file_path in structure_paths:
 
-            e_bulk, n_atoms, data_out_path = relax_and_calculate(file_path, path_to_model, fmax, 
+            e_bulk, n_atoms, data_out_path = relax_and_analyse(file_path, path_to_model, fmax, 
                                                                 steps, OVERWRITE, traj_out_dir, 
                                                                 data_out_dir, ovito_out_dir)
 
