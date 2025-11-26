@@ -3,7 +3,7 @@
 #$ -pe smp 4
 #$ -l s_rt=02:00:00
 #$ -j y
-#$ -o cryst_opt_$JOB_ID.log
+#$ -o $JOB_ID_cryst_opt.log
 
 # 1) Initialise conda
 source /u/vld/scat9451/miniconda3/etc/profile.d/conda.sh
