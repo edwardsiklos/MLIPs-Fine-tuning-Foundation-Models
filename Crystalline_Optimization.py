@@ -36,17 +36,16 @@ warnings.showwarning = suppress_warning
 
 import time
 from pathlib import Path
+import json
+import numpy as np
+
 from ase.io import read, write
 from ase.optimize import BFGS
 from ase.filters import FrechetCellFilter
-from graph_pes.models import load_model
-import json
-import torch
-import numpy as np
-#from quippy.potential import Potential
-from graph_pes.utils.calculator import GraphPESCalculator
 
-# Ovito for bond length and angle analysis
+from graph_pes.utils.calculator import GraphPESCalculator
+from graph_pes.interfaces import mace_mp
+
 import ovito
 from ovito.modifiers import CreateBondsModifier, BondAnalysisModifier
 from ovito.io import import_file
@@ -76,16 +75,14 @@ def import_crystal_structures(in_dir):
 # skin = 0.1 appears to be fastest due to nearest neighbour caching
 def load_model_and_calc(path_to_model):
 
-    path_to_model = Path(path_to_model)
-
-    if path_to_model.suffix == ".pt":
+    if Path(path_to_model).suffix == ".pt":
+        import torch
+        from graph_pes.models import load_model
         torch.set_default_dtype(torch.float32)
-        model = load_model(path_to_model)
+        model = load_model(Path(path_to_model))
         calc = GraphPESCalculator(model, skin=0.1, device='cpu')
-
-    elif path_to_model.suffix == ".xml":
-        print(f"Not compatible with.xml files yet")
-        return
+    elif Path(path_to_model).suffix == ".xml":
+        from quippy.potential import Potential
         class GAPWrapper:
             def __init__(self, potential):
                 self.potential = potential
@@ -102,14 +99,13 @@ def load_model_and_calc(path_to_model):
 
             def __getattr__(self, attr):
                 return getattr(self.potential, attr)
-        
-        potential = path_to_model.read_text()
-        raw_gap = Potential("IP GAP", param_str=potential)
+    
+        raw_gap = Potential(param_filename=path_to_model)
         calc = GAPWrapper(raw_gap)
     else:
-        print(f"Unrecognized model file extension for {Path(path_to_model).name}",
-              f"Must be either .pt (graph-pes-mace) or .xml (quippy)")
-        return
+        from graph_pes.interfaces import mace_mp
+        model = mace_mp(path_to_model)
+        calc = GraphPESCalculator(model, skin=0.1, device='cpu')
     
     return calc
 
@@ -135,7 +131,7 @@ def get_bond_lengths_and_angles(ase_atoms_object, cutoff, bins):
     a_values = bond_angles_xy[:,0]
     a_counts = bond_angles_xy[:,1]
     if a_counts.sum() == 0:
-        avg_bond_angle = np.nan
+        avg_bond_angle = None
         print(f"Zero angle counts found")
     else:
         avg_bond_angle = np.average(a_values, weights=a_counts)
@@ -144,7 +140,7 @@ def get_bond_lengths_and_angles(ase_atoms_object, cutoff, bins):
     l_values = bond_lengths_xy[:,0]
     l_counts = bond_lengths_xy[:,1]
     if l_counts.sum() == 0:
-        avg_bond_length = np.nan
+        avg_bond_length = None
         print(f"Zero bond counts found")
     else:
         avg_bond_length = np.average(l_values, weights=l_counts)
@@ -164,17 +160,15 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
     path_to_structure = Path(path_to_structure)
 
     # Outpaths
-    path_to_model = Path(path_to_model)
     path_to_structure = Path(path_to_structure)
-
     traj_dir = Path(traj_out_dir) / "Trajectories"
     traj_dir.mkdir(parents=True, exist_ok=True)
 
     final_traj_dir = Path(traj_out_dir)/ "Final Trajectory Frame"
     final_traj_dir.mkdir(parents=True, exist_ok=True)
 
-    traj_path = traj_dir / f"{path_to_model.stem}_{path_to_structure.stem}.traj"
-    final_frame_path = final_traj_dir / f"{path_to_model.stem}_relaxed_{path_to_structure.stem}.cif"
+    traj_path = traj_dir / f"{Path(path_to_model).stem}_{path_to_structure.stem}.traj"
+    final_frame_path = final_traj_dir / f"{Path(path_to_model).stem}_relaxed_{path_to_structure.stem}.cif"
         
     # Load model and calculator
     calc = load_model_and_calc(path_to_model)
@@ -190,9 +184,7 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
 
         # Relax reference structure with BFGS (allowing for cell params to change)
         ucf = FrechetCellFilter(structure)
-        opt = BFGS(ucf,
-                logfile=None,             
-                trajectory=traj_path)
+        opt = BFGS(ucf, trajectory=traj_path)
         
         tick = time.time()
         opt.run(fmax=fmax, steps=steps)
@@ -255,9 +247,9 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
     if not data_out_path.exists() or OVERWRITE:
         with open(data_out_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(data, indent=2) + "\n")
-            print(f"Wrote: {data_out_path.name}")
+            print(f"Wrote: {data_out_path.name}\n")
     else:
-        print(f"Skipped: {data_out_path.name}")
+        print(f"Skipped: {data_out_path.name}\n")
 
     return e_bulk, n_atoms, data_out_path
 
@@ -324,7 +316,7 @@ def energetics_analysis(in_dir, path_to_models, path_to_graphite_structure,
 models_to_analyse = ["MACE_Models/medium-0b3.pt", 
                      "MACE_Models/medium-mpa-0.pt",
                      "MACE_Models/medium-omat-0.pt",
-                     ]    
+                     "Potentials/Carbon_GAP_20.xml"]    
 
 set_OVERWRITE = False
 
