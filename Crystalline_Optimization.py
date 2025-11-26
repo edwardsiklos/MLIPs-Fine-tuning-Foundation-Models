@@ -42,6 +42,7 @@ from ase.filters import FrechetCellFilter
 from graph_pes.models import load_model
 import json
 import torch
+import numpy as np
 #from quippy.potential import Potential
 from graph_pes.utils.calculator import GraphPESCalculator
 
@@ -130,24 +131,29 @@ def get_bond_lengths_and_angles(ase_atoms_object, cutoff, bins):
 
     data = pipeline.compute()
 
-    bond_angles_xy  = data.tables["bond-angle-distr"].xy().tolist()
-    bond_lengths_xy = data.tables["bond-length-distr"].xy().tolist()
+    bond_angles_xy  = data.tables["bond-angle-distr"].xy()
+    a_values = bond_angles_xy[:,0]
+    a_counts = bond_angles_xy[:,1]
+    if a_counts.sum() == 0:
+        avg_bond_angle = np.nan
+        print(f"Zero angle counts found")
+    else:
+        avg_bond_angle = np.average(a_values, weights=a_counts)
 
-    bond_lengths = {
-    "value": [v[0] for v in bond_lengths_xy],
-    "count": [v[1] for v in bond_lengths_xy],
-    }
-
-    bond_angles = {
-        "value": [v[0] for v in bond_angles_xy],
-        "count": [v[1] for v in bond_angles_xy],
-    }
+    bond_lengths_xy = data.tables["bond-length-distr"].xy()
+    l_values = bond_lengths_xy[:,0]
+    l_counts = bond_lengths_xy[:,1]
+    if l_counts.sum() == 0:
+        avg_bond_length = np.nan
+        print(f"Zero bond counts found")
+    else:
+        avg_bond_length = np.average(l_values, weights=l_counts)
 
     # Remove Modifiers
     pipeline.modifiers.pop()
     pipeline.modifiers.pop()
 
-    return bond_lengths, bond_angles
+    return avg_bond_length, avg_bond_angle
 
 # Relaxes a structure 
 # Creates .traj, .cif (final frame), .json
@@ -212,8 +218,8 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
     energy_per_atom = relaxed_structure.get_potential_energy()/len(relaxed_structure)
     forces = relaxed_structure.get_forces()
     a, b, c, alpha, beta, gamma = relaxed_structure.cell.cellpar()
-    bond_lengths, bond_angles = get_bond_lengths_and_angles(relaxed_structure, 
-                                                            cutoff=1.85, bins=100)
+    avg_bond_length, avg_bond_angle = get_bond_lengths_and_angles(relaxed_structure, 
+                                                            cutoff=1.85, bins=100000)
 
     # Save path and file name
     data_out_dir = Path(data_out_dir) / f"{Path(path_to_model).stem}"
@@ -240,8 +246,8 @@ def relax_and_calculate(path_to_structure, path_to_model, fmax, steps,
             "gamma": gamma
         },
 
-        "bond_lengths" : bond_lengths,
-        "bond_angles"  : bond_angles,
+        "average_bond_length" : avg_bond_length,
+        "average_bond_angle"  : avg_bond_angle,
         "potential_energy/atom"   : energy_per_atom,
         "forces": forces.tolist() if hasattr(forces, "tolist") else forces
     }
