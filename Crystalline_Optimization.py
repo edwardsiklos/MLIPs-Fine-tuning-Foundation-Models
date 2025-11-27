@@ -33,7 +33,6 @@ def suppress_warning(message, category, filename, lineno, file=None, line=None):
 
 warnings.showwarning = suppress_warning
 
-
 import time
 from pathlib import Path
 import json
@@ -254,18 +253,18 @@ def relax_and_analyse(path_to_structure, path_to_model, fmax, steps,
 
     # Outpaths
     path_to_structure = Path(path_to_structure)
-    traj_dir = Path(traj_out_dir) / "Trajectories"
+    traj_dir = Path(traj_out_dir) / "Trajectories" / f"{Path(path_to_model).stem}"
     traj_dir.mkdir(parents=True, exist_ok=True)
 
-    final_traj_dir = Path(traj_out_dir)/ "Final Trajectory Frame"
+    final_traj_dir = Path(traj_out_dir)/ "Final Trajectory Frame" / f"{Path(path_to_model).stem}"
     final_traj_dir.mkdir(parents=True, exist_ok=True)
 
-    traj_path = traj_dir / f"{Path(path_to_model).stem}_{path_to_structure.stem}.traj"
-    final_frame_path = final_traj_dir / f"{Path(path_to_model).stem}_relaxed_{path_to_structure.stem}.cif"
+    traj_path = traj_dir / f"{path_to_structure.stem}.traj"
+    final_frame_path = final_traj_dir / f"{path_to_structure.stem}.cif"
     
-    ovito_out_dir = Path(ovito_out_dir) / path_to_structure.stem
+    ovito_out_dir = Path(ovito_out_dir) / Path(path_to_model).stem
     ovito_out_dir.mkdir(parents=True, exist_ok=True)
-    ovito_out_path = ovito_out_dir / Path(path_to_model).stem
+    ovito_out_path = ovito_out_dir / path_to_structure.stem
 
     # Load model and calculator
     calc = load_model_and_calc(path_to_model)
@@ -416,15 +415,15 @@ models_to_analyse = ["MACE_Models/medium-0b3.pt",
                      "MACE_Models/medium-mpa-0.pt",
                      "MACE_Models/medium-omat-0.pt",
                      "Potentials/Carbon_GAP_20.xml",
-                     "Potentials/carbon.xml"]    
+                     "Potentials/Carbon_GAP_17.xml"]    
 
-set_OVERWRITE = False
+set_OVERWRITE = True
 
 analysis(
     in_dir="/u/vld/scat9451/main_project/Carbon_Structures/Crystalline/Downloaded",
     path_to_models= models_to_analyse,
-    path_to_graphite_structure="Carbon_Structures/Graphite_mp169.cif",
-    path_to_isolated_atom="Carbon_Structures/isolated_C.cif",
+    path_to_graphite_structure="Carbon_Structures/Crystalline/Downloaded/Graphite.cif",
+    path_to_isolated_atom="Carbon_Structures/Single_atom_GAP_20.cif",
     fmax = 0.0001,
     steps = 1000,
     OVERWRITE=set_OVERWRITE,

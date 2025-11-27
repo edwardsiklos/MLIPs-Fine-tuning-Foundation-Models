@@ -1,7 +1,7 @@
 #!/bin/bash
 #$ -cwd
-#$ -pe smp 4
-#$ -l s_rt=02:00:00
+#$ -pe smp 32
+#$ -l s_rt=24:00:00
 #$ -j y
 #$ -o $JOB_ID_cryst_opt.log
 
@@ -21,7 +21,7 @@ conda activate quippy
 # conda install --strict-channel-priority -c https://conda.ovito.org -c conda-forge "numpy<2" ovito=3.14.1 -y
 # -------------------------------------------------------------------------------------------------------------
 
-# 3) Optional: use all reserved cores for threaded libs (PyTorch/BLAS)
+# 3) Cores Usage
 export OMP_NUM_THREADS=$NSLOTS
 export MKL_NUM_THREADS=$NSLOTS
 export OPENBLAS_NUM_THREADS=1 
@@ -30,5 +30,16 @@ export OPENBLAS_NUM_THREADS=1
 # OpenBLAS Warning : Detect OpenMP Loop and this application may hang. Please rebuild the library with USE_OPENMP=1 option.
 # This stops .xml file multithreading 
 
-# 4) Run your script (assuming it's in the submission directory)
+# 4) Run 
+start=$(date +%s)
 python Crystalline_Optimization.py
+
+end=$(date +%s)
+runtime=$(( end - start ))
+
+# Convert to H:M:S
+hours=$(( runtime / 3600 ))
+mins=$(( (runtime % 3600) / 60 ))
+secs=$(( runtime % 60 ))
+
+printf "Total runtime: %02d:%02d:%02d (hh:mm:ss)\n" "$hours" "$mins" "$secs" >> $JOB_ID_cryst_opt.log
